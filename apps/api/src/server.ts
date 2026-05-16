@@ -14,6 +14,9 @@ import {
 import { createSessionService } from "./sessions";
 import { createWorkspaceManager } from "./workspaces";
 
+const DEFAULT_SESSION_TITLES = new Set(["Untitled session", "未命名会话"]);
+const DEFAULT_SESSION_TITLE = "未命名会话";
+
 type CreateOpencodeSessionFn = typeof createOpencodeSession;
 type SendPromptFn = typeof sendPrompt;
 
@@ -124,7 +127,7 @@ export function createApiServer(options: ApiServerOptions = {}) {
         if (!current) return json(401, { error: "Authentication required." });
 
         const body = input.body as { title?: string };
-        const title = body.title?.trim() || "Untitled session";
+        const title = body.title?.trim() || DEFAULT_SESSION_TITLE;
         const session = await sessions.createPendingSession({ title, userId: current.user.id });
         const opencodeSession = await createOpencode({
           baseUrl: opencodeBaseUrl,
@@ -195,7 +198,7 @@ export function createApiServer(options: ApiServerOptions = {}) {
         const updated = db.updateWorkspaceSession({
           ...session,
           status: "ready",
-          title: session.title === "Untitled session" ? titleFromMessage(text) : session.title,
+          title: isDefaultSessionTitle(session.title) ? titleFromMessage(text) : session.title,
           updatedAt: message.createdAt,
         });
         return json(201, { message: serializeMessage(message), session: serializeSession(updated, db) });
@@ -270,7 +273,11 @@ function serializeSession(session: WorkspaceSession, db: MemoryDatabase) {
 }
 
 function titleFromMessage(text: string) {
-  return text.split(/\s+/).slice(0, 5).join(" ").slice(0, 60) || "Untitled session";
+  return text.split(/\s+/).slice(0, 5).join(" ").slice(0, 60) || DEFAULT_SESSION_TITLE;
+}
+
+function isDefaultSessionTitle(title: string) {
+  return DEFAULT_SESSION_TITLES.has(title.trim());
 }
 
 function configuredCorsOrigins() {

@@ -19,26 +19,26 @@ export function AuthScreen({ error, isSubmitting = false, onSubmit }: AuthScreen
 
   return (
     <main className="auth-shell">
-      <section className="auth-panel" aria-label="Create account">
+      <section className="auth-panel" aria-label="创建账号">
         <div className="auth-panel__mark" aria-hidden="true">
           <Bot size={24} strokeWidth={1.8} />
         </div>
         <p className="eyebrow">Opencode</p>
-        <h1>AI Workspace</h1>
-        <p className="auth-panel__copy">Sign in once, then keep every opencode session isolated and ready in history.</p>
+        <h1>AI 工作区</h1>
+        <p className="auth-panel__copy">登录一次，即可在历史记录中保留每个独立的 opencode 会话。</p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label>
-            <span>Email</span>
+            <span>邮箱</span>
             <input autoComplete="email" name="email" type="email" required />
           </label>
           <label>
-            <span>Password</span>
+            <span>密码</span>
             <input autoComplete="current-password" name="password" type="password" required />
           </label>
           {error ? <p className="auth-form__error" role="alert">{error}</p> : null}
           <button className="sidebar__new" disabled={isSubmitting} type="submit">
-            {isSubmitting ? "Creating..." : "Create account"}
+            {isSubmitting ? "创建中..." : "创建账号"}
           </button>
         </form>
       </section>

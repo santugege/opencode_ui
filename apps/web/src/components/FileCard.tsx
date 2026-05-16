@@ -2,16 +2,16 @@ import { FileText, Image, Table2, Video } from "lucide-react";
 import type { FileAttachmentView } from "../types";
 
 const statusLabel = {
-  ready: "Ready",
-  uploading: "Uploading",
-  error: "Error",
+  ready: "就绪",
+  uploading: "上传中",
+  error: "错误",
 } satisfies Record<FileAttachmentView["status"], string>;
 
 export function FileCard({ file }: { file: FileAttachmentView }) {
   const Icon = iconForKind(file.kind);
   const progress = Math.max(0, Math.min(100, file.progress ?? 0));
   const label =
-    file.status === "uploading" ? `Uploading ${progress}%` : statusLabel[file.status];
+    file.status === "uploading" ? `上传中 ${progress}%` : statusLabel[file.status];
 
   return (
     <article className="file-card" aria-label={`${file.name} ${label}`}>

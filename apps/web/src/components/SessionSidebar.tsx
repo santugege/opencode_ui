@@ -2,10 +2,10 @@ import { Circle, LogOut, Plus, Search } from "lucide-react";
 import type { SessionListItemView, UserView } from "../types";
 
 const statusLabel = {
-  ready: "ready",
-  thinking: "thinking",
-  running_tool: "running tool",
-  error: "error",
+  ready: "就绪",
+  thinking: "思考中",
+  running_tool: "运行工具中",
+  error: "错误",
 } satisfies Record<SessionListItemView["status"], string>;
 
 interface SessionSidebarProps {
@@ -19,27 +19,27 @@ interface SessionSidebarProps {
 
 export function SessionSidebar({ activeSessionId, onCreateSession, onSelectSession, onSignOut, sessions, user }: SessionSidebarProps) {
   return (
-    <aside className="sidebar" aria-label="Session history">
+    <aside className="sidebar" aria-label="会话历史">
       <div className="sidebar__brand">
         <span className="brand-mark" aria-hidden="true">OC</span>
         <div>
           <p className="eyebrow">Opencode</p>
-          <h1>AI Workspace</h1>
+          <h1>AI 工作区</h1>
         </div>
       </div>
 
       <button className="sidebar__new" onClick={onCreateSession} type="button">
         <Plus size={16} strokeWidth={2} />
-        New session
+        新建会话
       </button>
 
       <label className="sidebar__search">
         <Search size={15} strokeWidth={1.8} aria-hidden="true" />
-        <span className="sr-only">Search sessions</span>
-        <input type="search" placeholder="Search sessions" />
+        <span className="sr-only">搜索会话</span>
+        <input type="search" placeholder="搜索会话" />
       </label>
 
-      <nav className="session-list" aria-label="Sessions">
+      <nav className="session-list" aria-label="会话">
         {sessions.map((session) => {
           const isActive = session.id === activeSessionId;
 
@@ -71,10 +71,10 @@ export function SessionSidebar({ activeSessionId, onCreateSession, onSelectSessi
           <span>{initialFor(user.email)}</span>
           <div>
             <strong>{user.email}</strong>
-            <small>Personal workspace</small>
+            <small>个人工作区</small>
           </div>
         </div>
-        <button aria-label="Sign out" className="icon-button" onClick={onSignOut} type="button">
+        <button aria-label="退出登录" className="icon-button" onClick={onSignOut} type="button">
           <LogOut size={16} strokeWidth={1.9} />
         </button>
       </div>

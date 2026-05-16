@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import App, { WorkspaceApp } from "./App";
 import type { ApiClient, ApiSession } from "./api";
 import type { WorkspaceViewModel } from "./types";
+
+const styles = readFileSync("src/styles.css", "utf8");
 
 const viewModel: WorkspaceViewModel = {
   user: {
@@ -11,15 +14,15 @@ const viewModel: WorkspaceViewModel = {
   sessions: [
     {
       id: "session-1",
-      title: "Image extraction",
+      title: "图片提取",
       status: "thinking",
-      updatedAtLabel: "2m ago",
+      updatedAtLabel: "2 分钟前",
     },
     {
       id: "session-2",
-      title: "Quarterly brief",
+      title: "季度简报",
       status: "ready",
-      updatedAtLabel: "Yesterday",
+      updatedAtLabel: "昨天",
     },
   ],
   activeSessionId: "session-1",
@@ -27,7 +30,7 @@ const viewModel: WorkspaceViewModel = {
     {
       id: "message-1",
       role: "user",
-      content: "Pull the action items from this deck.",
+      content: "从这个演示文稿中提取待办事项。",
       createdAtLabel: "10:30",
       files: [
         {
@@ -42,7 +45,7 @@ const viewModel: WorkspaceViewModel = {
     {
       id: "message-2",
       role: "assistant",
-      content: "I found three launch risks and a missing owner for QA signoff.",
+      content: "我发现了三个发布风险，以及一个缺少负责人的 QA 签核项。",
       createdAtLabel: "10:31",
       files: [],
     },
@@ -64,18 +67,24 @@ const viewModel: WorkspaceViewModel = {
       status: "ready",
     },
   ],
-  error: "Opencode paused while the session reconnects.",
+  error: "会话正在重新连接，opencode 已暂停。",
 };
 
 describe("WorkspaceApp", () => {
-  it("renders the default workspace shell", () => {
+  it("renders the default workspace shell in Chinese", () => {
     render(<WorkspaceApp />);
 
-    expect(screen.getByRole("button", { name: "New session" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Document review" })).toBeInTheDocument();
-    expect(screen.getByText("Compare these notes and tell me what needs follow-up before the review.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新建会话" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "文档审阅" })).toBeInTheDocument();
+    expect(screen.getByText("对比这些笔记，并告诉我评审前需要跟进的事项。")).toBeInTheDocument();
     expect(screen.getByText("interview-notes.docx")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Message opencode...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("发送消息给 opencode...")).toBeInTheDocument();
+  });
+
+  it("uses the light reference background instead of the old black theme", () => {
+    expect(styles).toContain("background: #ffffff;");
+    expect(styles).toContain("linear-gradient(180deg, #eef5fb 0%, #f8faf4 55%, #fff7d7 100%)");
+    expect(styles).not.toMatch(/background:\s*#(?:0f0f0d|11100e|151411|0d0d0b)\b/i);
   });
 
   it("renders the empty session state", () => {
@@ -86,9 +95,9 @@ describe("WorkspaceApp", () => {
           sessions: [
             {
               id: "session-empty",
-              title: "Untitled session",
+              title: "未命名会话",
               status: "ready",
-              updatedAtLabel: "Now",
+              updatedAtLabel: "刚刚",
             },
           ],
           activeSessionId: "session-empty",
@@ -98,21 +107,21 @@ describe("WorkspaceApp", () => {
       />,
     );
 
-    expect(screen.getAllByText("Untitled session")).toHaveLength(3);
-    expect(screen.getByText("Ask anything, attach files, and opencode will work inside this isolated session.")).toBeInTheDocument();
+    expect(screen.getAllByText("未命名会话")).toHaveLength(3);
+    expect(screen.getByText("输入问题、附加文件，opencode 会在这个独立会话中工作。")).toBeInTheDocument();
   });
 
   it("renders session history, status, chat messages, and inline files", () => {
     render(<WorkspaceApp model={viewModel} />);
 
-    expect(screen.getByRole("complementary", { name: "Session history" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New session" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Image extraction thinking 2m ago" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByText("Quarterly brief")).toBeInTheDocument();
-    expect(screen.getByText("Thinking")).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "会话历史" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新建会话" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "图片提取 思考中 2 分钟前" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("季度简报")).toBeInTheDocument();
+    expect(screen.getByText("思考中")).toBeInTheDocument();
 
-    expect(screen.getByText("Pull the action items from this deck.")).toBeInTheDocument();
-    expect(screen.getByText("I found three launch risks and a missing owner for QA signoff.")).toBeInTheDocument();
+    expect(screen.getByText("从这个演示文稿中提取待办事项。")).toBeInTheDocument();
+    expect(screen.getByText("我发现了三个发布风险，以及一个缺少负责人的 QA 签核项。")).toBeInTheDocument();
     expect(screen.getByText("launch-plan.pdf")).toBeInTheDocument();
     expect(screen.getByText("1.8 MB")).toBeInTheDocument();
   });
@@ -121,15 +130,15 @@ describe("WorkspaceApp", () => {
     const onRetry = vi.fn();
     render(<WorkspaceApp model={viewModel} onRetry={onRetry} />);
 
-    expect(screen.getByLabelText("Attach files")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Send message" })).toBeInTheDocument();
+    expect(screen.getByLabelText("附加文件")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发送消息" })).toBeInTheDocument();
     expect(screen.getByText("interview-notes.docx")).toBeInTheDocument();
-    expect(screen.getByText("Uploading 62%")).toBeInTheDocument();
+    expect(screen.getByText("上传中 62%")).toBeInTheDocument();
     expect(screen.getByText("screenshot.png")).toBeInTheDocument();
-    expect(screen.getByRole("article", { name: "screenshot.png Ready" })).toBeInTheDocument();
-    expect(screen.getByText("Opencode paused while the session reconnects.")).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "screenshot.png 就绪" })).toBeInTheDocument();
+    expect(screen.getByText("会话正在重新连接，opencode 已暂停。")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Retry opencode request" }));
+    fireEvent.click(screen.getByRole("button", { name: "重试 opencode 请求" }));
 
     expect(onRetry).toHaveBeenCalledOnce();
   });
@@ -140,56 +149,56 @@ describe("App integration shell", () => {
     const api = createFakeApi();
     render(<App api={api} />);
 
-    expect(await screen.findByRole("heading", { name: "AI Workspace" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "AI 工作区" })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Email"), {
+    fireEvent.change(screen.getByLabelText("邮箱"), {
       target: { value: "person@example.com" },
     });
-    fireEvent.change(screen.getByLabelText("Password"), {
+    fireEvent.change(screen.getByLabelText("密码"), {
       target: { value: "secret123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    fireEvent.click(screen.getByRole("button", { name: "创建账号" }));
 
-    await screen.findByRole("button", { name: "New session" });
+    await screen.findByRole("button", { name: "新建会话" });
 
     expect(screen.getByText("person@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Ask anything, attach files, and opencode will work inside this isolated session.")).toBeInTheDocument();
+    expect(screen.getByText("输入问题、附加文件，opencode 会在这个独立会话中工作。")).toBeInTheDocument();
   });
 
   it("creates a session, uploads a file, sends a message, and revisits session history", async () => {
     const api = createFakeApi();
     render(<App api={api} />);
 
-    fireEvent.change(await screen.findByLabelText("Email"), {
+    fireEvent.change(await screen.findByLabelText("邮箱"), {
       target: { value: "person@example.com" },
     });
-    fireEvent.change(screen.getByLabelText("Password"), {
+    fireEvent.change(screen.getByLabelText("密码"), {
       target: { value: "secret123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
-    await screen.findByRole("button", { name: "New session" });
+    fireEvent.click(screen.getByRole("button", { name: "创建账号" }));
+    await screen.findByRole("button", { name: "新建会话" });
 
-    fireEvent.click(screen.getByRole("button", { name: "New session" }));
-    expect(await screen.findByRole("button", { name: "Untitled session ready Now" })).toHaveAttribute("aria-current", "page");
+    fireEvent.click(screen.getByRole("button", { name: "新建会话" }));
+    expect(await screen.findByRole("button", { name: "未命名会话 就绪 刚刚" })).toHaveAttribute("aria-current", "page");
 
     const file = new File(["Quarterly numbers"], "quarterly.csv", { type: "text/csv" });
-    fireEvent.change(screen.getByLabelText("Attach files"), {
+    fireEvent.change(screen.getByLabelText("附加文件"), {
       target: { files: [file] },
     });
 
     await screen.findByText("quarterly.csv");
 
-    fireEvent.change(screen.getByPlaceholderText("Message opencode..."), {
+    fireEvent.change(screen.getByPlaceholderText("发送消息给 opencode..."), {
       target: { value: "Summarize this spreadsheet." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    fireEvent.click(screen.getByRole("button", { name: "发送消息" }));
 
     await waitFor(() => {
       expect(within(screen.getByRole("list")).getByText("Summarize this spreadsheet.")).toBeInTheDocument();
     });
-    expect(screen.getByRole("article", { name: "quarterly.csv Ready" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "quarterly.csv 就绪" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Summarize this spreadsheet. ready Now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Summarize this spreadsheet. 就绪 刚刚" }));
 
     await waitFor(() => {
       expect(within(screen.getByRole("list")).getByText("Summarize this spreadsheet.")).toBeInTheDocument();
@@ -200,18 +209,18 @@ describe("App integration shell", () => {
     const api = createFakeApi();
     render(<App api={api} />);
 
-    fireEvent.change(await screen.findByLabelText("Email"), {
+    fireEvent.change(await screen.findByLabelText("邮箱"), {
       target: { value: "person@example.com" },
     });
-    fireEvent.change(screen.getByLabelText("Password"), {
+    fireEvent.change(screen.getByLabelText("密码"), {
       target: { value: "secret123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
-    await screen.findByRole("button", { name: "New session" });
+    fireEvent.click(screen.getByRole("button", { name: "创建账号" }));
+    await screen.findByRole("button", { name: "新建会话" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
 
-    expect(await screen.findByRole("button", { name: "Create account" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "创建账号" })).toBeInTheDocument();
     expect(screen.queryByText("person@example.com")).not.toBeInTheDocument();
     expect(api.logout).toHaveBeenCalledOnce();
   });

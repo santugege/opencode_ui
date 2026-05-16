@@ -3,10 +3,10 @@ import { FileCard } from "./FileCard";
 import type { ChatMessageView, SessionListItemView } from "../types";
 
 const statusLabel = {
-  ready: "Ready",
-  thinking: "Thinking",
-  running_tool: "Running tool",
-  error: "Error",
+  ready: "就绪",
+  thinking: "思考中",
+  running_tool: "运行工具中",
+  error: "错误",
 } satisfies Record<SessionListItemView["status"], string>;
 
 interface ChatViewProps {
@@ -18,11 +18,11 @@ interface ChatViewProps {
 
 export function ChatView({ activeSession, error, messages, onRetry }: ChatViewProps) {
   return (
-    <section className="chat" aria-label="Chat workspace">
+    <section className="chat" aria-label="聊天工作区">
       <header className="chat__header">
         <div>
-          <p className="eyebrow">Session</p>
-          <h2>{activeSession?.title ?? "Untitled session"}</h2>
+          <p className="eyebrow">会话</p>
+          <h2>{activeSession?.title ?? "未命名会话"}</h2>
         </div>
         <span className={`status-pill status-pill--${activeSession?.status ?? "ready"}`}>
           {statusLabel[activeSession?.status ?? "ready"]}
@@ -35,7 +35,7 @@ export function ChatView({ activeSession, error, messages, onRetry }: ChatViewPr
           <span>{error}</span>
           <button onClick={onRetry} type="button">
             <RotateCcw size={14} strokeWidth={2} />
-            Retry opencode request
+            重试 opencode 请求
           </button>
         </div>
       ) : null}
@@ -56,7 +56,7 @@ export function ChatView({ activeSession, error, messages, onRetry }: ChatViewPr
                 </span>
                 <div className="message__content">
                   <div className="message__meta">
-                    <strong>{message.role === "assistant" ? "Opencode" : "You"}</strong>
+                    <strong>{message.role === "assistant" ? "Opencode" : "你"}</strong>
                     <span>{message.createdAtLabel}</span>
                   </div>
                   <p>{message.content}</p>
@@ -83,8 +83,8 @@ function EmptySession() {
       <div className="empty-state__mark" aria-hidden="true">
         <Bot size={26} strokeWidth={1.65} />
       </div>
-      <h2>Untitled session</h2>
-      <p>Ask anything, attach files, and opencode will work inside this isolated session.</p>
+      <h2>未命名会话</h2>
+      <p>输入问题、附加文件，opencode 会在这个独立会话中工作。</p>
     </div>
   );
 }

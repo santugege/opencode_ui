@@ -35,6 +35,10 @@
 - Real browser check confirmed `Search sessions` accepts text but does not filter or otherwise update the session list.
 - Real browser check confirmed `Session controls` click has no visible effect.
 - Real browser check confirmed `Sign out` click has no visible effect and user remains logged in.
+- Sign out fix added a real `/auth/logout` route, browser API logout call, and sidebar button wiring.
+- After restarting the UI API, `POST http://127.0.0.1:8787/auth/logout` returned `200 OK` with a clear-cookie response.
+- Real browser re-check for Sign out passed: registering `signout-fix-20260516-1333@example.com`, clicking `Sign out`, and reloading left the browser on the `Create account` screen with no cookies.
+- Playwright network audit for the fixed path showed `POST /auth/logout => 200 OK`; subsequent `/auth/me` calls returned `401 Unauthorized`, which is expected after logout.
 - Real browser reload preserved authenticated user and session history. Network after reload showed `/auth/me` 200 and `/sessions` 200.
 - Human-path network audit showed expected successful requests: register 201, list sessions 200, create sessions 201, upload file 201, send messages 201.
 - Current page console after reload had 0 errors and 0 warnings.

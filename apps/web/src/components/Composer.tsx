@@ -27,7 +27,7 @@ export function Composer({ files, onAttachFiles, onSendMessage }: ComposerProps)
   return (
     <form className="composer" onSubmit={handleSubmit}>
       {files.length > 0 ? (
-        <div className="composer__files" aria-label="Attached files">
+        <div className="composer__files" aria-label="已附加文件">
           {files.map((file) => (
             <FileCard file={file} key={file.id} />
           ))}
@@ -37,13 +37,13 @@ export function Composer({ files, onAttachFiles, onSendMessage }: ComposerProps)
       <div className="composer__input-row">
         <label className="icon-button composer__attach">
           <Paperclip size={18} strokeWidth={1.9} />
-          <input aria-label="Attach files" name="files" onChange={handleFiles} type="file" />
+          <input aria-label="附加文件" name="files" onChange={handleFiles} type="file" />
         </label>
-        <textarea name="message" placeholder="Message opencode..." rows={1} />
-        <button aria-label="Session controls" className="icon-button" type="button">
+        <textarea name="message" placeholder="发送消息给 opencode..." rows={1} />
+        <button aria-label="会话控制" className="icon-button" type="button">
           <SlidersHorizontal size={18} strokeWidth={1.9} />
         </button>
-        <button aria-label="Send message" className="send-button" type="submit">
+        <button aria-label="发送消息" className="send-button" type="submit">
           <SendHorizontal size={18} strokeWidth={2} />
         </button>
       </div>

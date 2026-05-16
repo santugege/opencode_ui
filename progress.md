@@ -36,6 +36,10 @@
 | Human path: search sessions | Type `Second` in Search sessions | Session list filters or otherwise searches | Both sessions remained visible; no filtering/feedback | Fail |
 | Human path: session controls | Click `Session controls` | Controls panel opens or provides visible feedback | No visible UI/state change | Fail |
 | Human path: sign out | Click `Sign out` | User returns to auth screen or session clears | Stayed logged in on same workspace | Fail |
+| Sign out fix: API route | `POST http://127.0.0.1:8787/auth/logout` after API restart | `200 OK` and session cookie cleared | `200 OK`, `{"ok":true}`, `Set-Cookie: opencode_ui_session=... Max-Age=0` | Pass |
+| Sign out fix: human browser path | Fresh browser session, register `signout-fix-20260516-1333@example.com`, click `Sign out` | User returns to auth screen | Page returned to `Create account` form immediately after click | Pass |
+| Sign out fix: reload persistence | Reload after sign out | User remains logged out | Reload stayed on `Create account`; cookie list was empty; `/auth/me` returned 401 | Pass |
+| Sign out fix: network audit | Playwright CLI `requests` | Logout request succeeds | `POST /auth/logout => 200 OK` | Pass |
 | Human path: refresh persistence | Browser reload after two sessions/messages | User remains logged in and session history restores | Account, two sessions, and first message/file restored | Pass |
 | Human path: current console | Playwright CLI `console error` after reload | No active-page errors | 0 errors, 0 warnings in current page state | Pass |
 | Human path: network audit | Playwright CLI `requests` | Expected auth/session/file/message requests succeed | register 201, sessions list 200, sessions create 201, file 201, messages 201, refresh auth/me 200, sessions 200 | Pass |

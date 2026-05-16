@@ -198,4 +198,38 @@ describe("api server routes", () => {
     expect(message.status).toBe(201);
     expect((message.body as AnyJson).message.content).toBe("Hello test mode.");
   });
+
+  it("promotes Chinese default session titles to the first message title", async () => {
+    const server = createApiServer({
+      opencodeMode: "stub",
+      storageRoot,
+    });
+
+    const register = await server.fetchJson("/auth/register", {
+      body: { email: "person@example.com", password: "secret123" },
+      method: "POST",
+    });
+    const cookie = register.headers.get("set-cookie") ?? "";
+
+    const created = await server.fetchJson("/sessions", {
+      body: { title: "未命名会话" },
+      headers: { cookie },
+      method: "POST",
+    });
+
+    expect(created.status).toBe(201);
+    const createdBody = created.body as AnyJson;
+
+    const message = await server.fetchJson(`/sessions/${createdBody.session.id}/messages`, {
+      body: {
+        fileIds: [],
+        text: "Summarize this spreadsheet.",
+      },
+      headers: { cookie },
+      method: "POST",
+    });
+
+    expect(message.status).toBe(201);
+    expect((message.body as AnyJson).session.title).toBe("Summarize this spreadsheet.");
+  });
 });

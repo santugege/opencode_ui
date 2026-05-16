@@ -25,21 +25,21 @@ const defaultModel: WorkspaceViewModel = {
   sessions: [
     {
       id: "session-chat",
-      title: "Document review",
+      title: "文档审阅",
       status: "thinking",
-      updatedAtLabel: "Now",
+      updatedAtLabel: "刚刚",
     },
     {
       id: "session-empty",
-      title: "Untitled session",
+      title: "未命名会话",
       status: "ready",
-      updatedAtLabel: "12m ago",
+      updatedAtLabel: "12 分钟前",
     },
     {
       id: "session-error",
-      title: "Video notes",
+      title: "视频笔记",
       status: "error",
-      updatedAtLabel: "Yesterday",
+      updatedAtLabel: "昨天",
     },
   ],
   activeSessionId: "session-chat",
@@ -47,7 +47,7 @@ const defaultModel: WorkspaceViewModel = {
     {
       id: "message-demo-1",
       role: "user",
-      content: "Compare these notes and tell me what needs follow-up before the review.",
+      content: "对比这些笔记，并告诉我评审前需要跟进的事项。",
       createdAtLabel: "21:12",
       files: [
         {
@@ -62,7 +62,7 @@ const defaultModel: WorkspaceViewModel = {
     {
       id: "message-demo-2",
       role: "assistant",
-      content: "I found four open questions, two missing owners, and one section that needs a source before you share it.",
+      content: "我发现了四个待确认问题、两个缺少负责人的事项，以及一个分享前需要补充来源的段落。",
       createdAtLabel: "21:13",
       files: [],
     },
@@ -178,14 +178,14 @@ export default function App({ api = browserApi }: AppProps) {
       setSessions(nextSessions);
       setActiveSessionId(nextSessions[0]?.id ?? null);
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Unable to create account.");
+      setAuthError(error instanceof Error ? error.message : "无法创建账号。");
     } finally {
       setIsSubmittingAuth(false);
     }
   }
 
   async function handleCreateSession() {
-    const session = await api.createSession({ title: "Untitled session" });
+    const session = await api.createSession({ title: "未命名会话" });
     setSessions((current) => [session, ...current.filter((candidate) => candidate.id !== session.id)]);
     setActiveSessionId(session.id);
     setPendingFiles([]);
@@ -194,7 +194,7 @@ export default function App({ api = browserApi }: AppProps) {
 
   async function handleAttachFiles(files: File[]) {
     if (!activeSessionId) {
-      const session = await api.createSession({ title: "Untitled session" });
+      const session = await api.createSession({ title: "未命名会话" });
       setSessions((current) => [session, ...current]);
       setActiveSessionId(session.id);
       await uploadFiles(session.id, files);
@@ -259,7 +259,7 @@ export default function App({ api = browserApi }: AppProps) {
   }
 
   if (isCheckingAuth) {
-    return <div className="auth-shell"><p className="eyebrow">Loading workspace</p></div>;
+    return <div className="auth-shell"><p className="eyebrow">正在加载工作区</p></div>;
   }
 
   if (!model) {
@@ -283,7 +283,7 @@ function toSessionView(session: ApiSession) {
     id: session.id,
     status: session.status,
     title: session.title,
-    updatedAtLabel: "Now",
+    updatedAtLabel: "刚刚",
   };
 }
 
