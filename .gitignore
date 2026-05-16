@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.local
+storage/workspaces/
+apps/api/storage/workspaces/
+output/
+.playwright-cli/
+*.log
