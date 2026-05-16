@@ -2,10 +2,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createMemoryDatabase } from "./db";
-import { createFileService, inferFileKind, sanitizeUploadName } from "./files";
-import { createSessionService } from "./sessions";
-import { isInsideDirectory, createWorkspaceManager } from "./workspaces";
+import { createMemoryDatabase } from "../../src/repositories/memory.repository";
+import { createFileService, inferFileKind, sanitizeUploadName } from "../../src/services/file.service";
+import { createSessionService } from "../../src/services/session.service";
+import { isInsideDirectory, createWorkspaceManager } from "../../src/services/workspace.service";
 
 describe("file uploads", () => {
   let root: string;

@@ -15,7 +15,7 @@ export interface WorkspaceAppProps {
   onRetry?: () => void;
   onSelectSession?: (sessionId: string) => void;
   onSignOut?: () => void;
-  onSendMessage?: (text: string) => void;
+  onSendMessage?: (text: string) => boolean | Promise<boolean | void> | void;
 }
 
 const defaultModel: WorkspaceViewModel = {
@@ -132,6 +132,7 @@ export default function App({ api = browserApi }: AppProps) {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [pendingFiles, setPendingFiles] = useState<FileAttachmentView[]>([]);
   const [pendingFileIds, setPendingFileIds] = useState<string[]>([]);
+  const [sendError, setSendError] = useState<string | undefined>();
   const [sessions, setSessions] = useState<ApiSession[]>([]);
   const [user, setUser] = useState<{ email: string } | null>(null);
 
@@ -162,11 +163,12 @@ export default function App({ api = browserApi }: AppProps) {
     return {
       activeSessionId,
       composerFiles: pendingFiles,
+      error: sendError,
       messages: activeSession?.messages.map(toMessageView) ?? [],
       sessions: sessions.map(toSessionView),
       user,
     };
-  }, [activeSessionId, pendingFiles, sessions, user]);
+  }, [activeSessionId, pendingFiles, sendError, sessions, user]);
 
   async function handleAuth(input: { email: string; password: string }) {
     setAuthError(undefined);
@@ -174,6 +176,7 @@ export default function App({ api = browserApi }: AppProps) {
     try {
       const result = await api.register(input);
       setUser(result.user);
+      setSendError(undefined);
       const nextSessions = await api.listSessions();
       setSessions(nextSessions);
       setActiveSessionId(nextSessions[0]?.id ?? null);
@@ -185,6 +188,7 @@ export default function App({ api = browserApi }: AppProps) {
   }
 
   async function handleCreateSession() {
+    setSendError(undefined);
     const session = await api.createSession({ title: "未命名会话" });
     setSessions((current) => [session, ...current.filter((candidate) => candidate.id !== session.id)]);
     setActiveSessionId(session.id);
@@ -235,17 +239,24 @@ export default function App({ api = browserApi }: AppProps) {
 
   async function handleSendMessage(text: string) {
     const trimmed = text.trim();
-    if (!trimmed || !activeSessionId) return;
-    const result = await api.sendMessage(activeSessionId, {
-      fileIds: pendingFileIds,
-      text: trimmed,
-    });
-    setSessions((current) =>
-      current.map((session) => (session.id === activeSessionId ? result.session : session)),
-    );
-    setActiveSessionId(result.session.id);
-    setPendingFiles([]);
-    setPendingFileIds([]);
+    if (!trimmed) return false;
+
+    setSendError(undefined);
+    try {
+      const sessionId = await ensureActiveSession();
+      const result = await api.sendMessage(sessionId, {
+        fileIds: pendingFileIds,
+        text: trimmed,
+      });
+      setSessions((current) => upsertSession(current, result.session));
+      setActiveSessionId(result.session.id);
+      setPendingFiles([]);
+      setPendingFileIds([]);
+      return true;
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : "发送消息失败。");
+      return false;
+    }
   }
 
   async function handleSignOut() {
@@ -254,8 +265,18 @@ export default function App({ api = browserApi }: AppProps) {
     setAuthError(undefined);
     setPendingFiles([]);
     setPendingFileIds([]);
+    setSendError(undefined);
     setSessions([]);
     setUser(null);
+  }
+
+  async function ensureActiveSession() {
+    if (activeSessionId) return activeSessionId;
+
+    const session = await api.createSession({ title: "未命名会话" });
+    setSessions((current) => upsertSession(current, session));
+    setActiveSessionId(session.id);
+    return session.id;
   }
 
   if (isCheckingAuth) {
@@ -298,6 +319,12 @@ function toMessageView(message: ApiSession["messages"][number]) {
     id: message.id,
     role: message.role,
   };
+}
+
+function upsertSession(sessions: ApiSession[], nextSession: ApiSession) {
+  const hasSession = sessions.some((session) => session.id === nextSession.id);
+  if (!hasSession) return [nextSession, ...sessions];
+  return sessions.map((session) => (session.id === nextSession.id ? nextSession : session));
 }
 
 function toFileView(file: ApiFile): FileAttachmentView {

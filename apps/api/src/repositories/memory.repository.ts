@@ -1,18 +1,33 @@
 import type { ChatMessage, SessionFile, User, WorkspaceSession } from "@opencode-ui/shared";
 
+/**
+ * 与用户记录关联的密码哈希。
+ */
 export interface PasswordHashRecord {
+  /** 拥有该密码哈希的用户 ID。 */
   userId: string;
+  /** 带算法前缀的密码哈希值。 */
   passwordHash: string;
 }
 
+/**
+ * 用户登录后持久化的浏览器会话。
+ */
 export interface UserSessionRecord {
+  /** 存储在 HTTP-only cookie 中的不透明会话标识。 */
   id: string;
+  /** 已认证用户 ID。 */
   userId: string;
+  /** ISO 时间戳，用于审计和后续过期处理。 */
   createdAt: string;
 }
 
+/**
+ * 服务层使用的仓储契约。当前实现为内存存储，路由只依赖该接口，
+ * 未来替换为持久化存储时不需要修改 HTTP 处理器。
+ */
 export interface MemoryDatabase {
-  createUser(input: { id: string; email: string; createdAt: string }): User;
+  createUser(input: { createdAt: string; email: string; id: string }): User;
   findUserByEmail(email: string): User | undefined;
   findUserById(id: string): User | undefined;
   setPasswordHash(input: PasswordHashRecord): void;
@@ -29,6 +44,9 @@ export interface MemoryDatabase {
   listChatMessages(sessionId: string): ChatMessage[];
 }
 
+/**
+ * 创建开发阶段使用的进程内仓储。
+ */
 export function createMemoryDatabase(): MemoryDatabase {
   const usersById = new Map<string, User>();
   const userIdsByEmail = new Map<string, string>();

@@ -1,22 +1,31 @@
 import { Paperclip, SendHorizontal, SlidersHorizontal } from "lucide-react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import { FileCard } from "./FileCard";
 import type { FileAttachmentView } from "../types";
-import type { ChangeEvent, FormEvent } from "react";
 
 interface ComposerProps {
   files: FileAttachmentView[];
   onAttachFiles?: (files: File[]) => void;
-  onSendMessage?: (text: string) => void;
+  onSendMessage?: (text: string) => boolean | Promise<boolean | void> | void;
 }
 
 export function Composer({ files, onAttachFiles, onSendMessage }: ComposerProps) {
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSubmitting) return;
+
     const form = event.currentTarget;
     const data = new FormData(form);
     const text = String(data.get("message") ?? "");
-    onSendMessage?.(text);
-    form.reset();
+    setIsSubmitting(true);
+    try {
+      const shouldReset = await onSendMessage?.(text);
+      if (shouldReset !== false) form.reset();
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function handleFiles(event: ChangeEvent<HTMLInputElement>) {
@@ -43,7 +52,7 @@ export function Composer({ files, onAttachFiles, onSendMessage }: ComposerProps)
         <button aria-label="会话控制" className="icon-button" type="button">
           <SlidersHorizontal size={18} strokeWidth={1.9} />
         </button>
-        <button aria-label="发送消息" className="send-button" type="submit">
+        <button aria-label="发送消息" className="send-button" disabled={isSubmitting} type="submit">
           <SendHorizontal size={18} strokeWidth={2} />
         </button>
       </div>

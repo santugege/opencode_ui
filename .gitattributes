@@ -1,0 +1,11 @@
+# 1. 默认：自动检测文本，统一强制使用 LF 换行符
+* text=auto eol=lf
+
+# 2. 保护：明确声明图片、字体等二进制文件，防止 Git 误改损坏文件
+*.{png,jpg,jpeg,gif,webp,ico,avif} binary
+*.{woff,woff2,ttf,eot,otf} binary
+*.{pdf,zip,gz,tar,rar} binary
+
+# 3. 特例：如果项目里有 Windows 独有的批处理文件，强制保留 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf

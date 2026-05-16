@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AuthError, createAuthService, parseSessionCookie } from "./auth";
-import { createMemoryDatabase } from "./db";
+import { createMemoryDatabase } from "../../src/repositories/memory.repository";
+import { AuthError, createAuthService, parseSessionCookie } from "../../src/services/auth.service";
 
 describe("auth service", () => {
   it("hashes passwords without storing plaintext", async () => {

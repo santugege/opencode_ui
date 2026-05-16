@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createApiServer, type ApiServerOptions } from "./server";
+import { createApiServer, type ApiServerOptions } from "../../src/app/createApp";
 
 let storageRoot: string;
 

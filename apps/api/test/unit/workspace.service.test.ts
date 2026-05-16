@@ -2,9 +2,9 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createMemoryDatabase } from "./db";
-import { createSessionService } from "./sessions";
-import { createWorkspaceManager, isInsideDirectory } from "./workspaces";
+import { createMemoryDatabase } from "../../src/repositories/memory.repository";
+import { createSessionService } from "../../src/services/session.service";
+import { createWorkspaceManager, isInsideDirectory } from "../../src/services/workspace.service";
 
 describe("session workspace lifecycle", () => {
   let root: string;

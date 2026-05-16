@@ -33,10 +33,12 @@ export function ChatView({ activeSession, error, messages, onRetry }: ChatViewPr
         <div className="chat__error" role="alert">
           <AlertCircle size={17} strokeWidth={1.9} />
           <span>{error}</span>
-          <button onClick={onRetry} type="button">
-            <RotateCcw size={14} strokeWidth={2} />
-            重试 opencode 请求
-          </button>
+          {onRetry ? (
+            <button onClick={onRetry} type="button">
+              <RotateCcw size={14} strokeWidth={2} />
+              重试 opencode 请求
+            </button>
+          ) : null}
         </div>
       ) : null}
 

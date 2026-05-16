@@ -2,13 +2,8 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createOpencodeSession,
-  mapOpencodeError,
-  opencodeForWorkspace,
-  sendPrompt,
-  type CreateOpencodeClient,
-} from "./opencodeClient";
+import { createOpencodeService, mapOpencodeError } from "../../src/services/opencode.service";
+import type { CreateOpencodeClient } from "../../src/types/opencode";
 
 describe("opencode client", () => {
   let workspacePath: string;
@@ -21,48 +16,55 @@ describe("opencode client", () => {
     await rm(workspacePath, { recursive: true, force: true });
   });
 
-  it("creates an SDK client scoped to the session workspace directory", () => {
+  it("creates one SDK client without binding it to a workspace directory", () => {
     const factory = vi.fn(() => ({ session: {} }));
 
-    const client = opencodeForWorkspace({
+    const service = createOpencodeService({
       baseUrl: "http://127.0.0.1:4096",
-      workspacePath,
       createClient: factory as CreateOpencodeClient,
     });
 
-    expect(client).toEqual({ session: {} });
+    expect(service).toHaveProperty("createSession");
+    expect(service).toHaveProperty("sendPrompt");
     expect(factory).toHaveBeenCalledWith({
       baseUrl: "http://127.0.0.1:4096",
-      directory: workspacePath,
       throwOnError: true,
     });
   });
 
-  it("creates opencode sessions with the user-owned workspace path", async () => {
+  it("creates opencode sessions with the user-owned workspace directory query", async () => {
     const sessionCreate = vi.fn(async () => ({ data: { id: "opencode_session_1", title: "New chat" } }));
     const factory = vi.fn(() => ({ session: { create: sessionCreate } }));
-
-    const session = await createOpencodeSession({
+    const service = createOpencodeService({
       baseUrl: "http://127.0.0.1:4096",
-      workspacePath,
-      title: "New chat",
       createClient: factory as CreateOpencodeClient,
     });
 
+    const session = await service.createSession({
+      workspacePath,
+      title: "New chat",
+    });
+
     expect(session.id).toBe("opencode_session_1");
-    expect(factory).toHaveBeenCalledWith(expect.objectContaining({ directory: workspacePath }));
-    expect(sessionCreate).toHaveBeenCalledWith({ body: { title: "New chat" } });
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(sessionCreate).toHaveBeenCalledWith({
+      body: { title: "New chat" },
+      query: { directory: workspacePath },
+    });
   });
 
-  it("sends text and workspace files as opencode prompt parts", async () => {
+  it("sends text and workspace files with the user-owned workspace directory query", async () => {
     const attachmentPath = join(workspacePath, "uploads", "brief.txt");
     await mkdir(join(workspacePath, "uploads"), { recursive: true });
     await writeFile(attachmentPath, "hello", "utf8");
     const sessionPrompt = vi.fn(async () => ({ data: { info: { id: "message_1" }, parts: [] } }));
     const factory = vi.fn(() => ({ session: { prompt: sessionPrompt } }));
-
-    await sendPrompt({
+    const service = createOpencodeService({
       baseUrl: "http://127.0.0.1:4096",
+      createClient: factory as CreateOpencodeClient,
+    });
+
+    await service.sendPrompt({
       workspacePath,
       opencodeSessionId: "opencode_session_1",
       text: "Summarize this.",
@@ -73,11 +75,12 @@ describe("opencode client", () => {
           filename: "brief.txt",
         },
       ],
-      createClient: factory as CreateOpencodeClient,
     });
 
+    expect(factory).toHaveBeenCalledTimes(1);
     expect(sessionPrompt).toHaveBeenCalledWith({
       path: { id: "opencode_session_1" },
+      query: { directory: workspacePath },
       body: {
         parts: [
           {
