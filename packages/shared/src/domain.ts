@@ -5,16 +5,16 @@ export type FileKind = "image" | "video" | "document" | "spreadsheet" | "other";
 export interface User {
   id: string;
   email: string;
+  /** 相对当前项目根目录的工作区路径。 */
+  workspacePath: string;
   createdAt: string;
 }
 
 export interface WorkspaceSession {
   id: string;
   userId: string;
-  opencodeSessionId: string | null;
   title: string;
   status: SessionStatus;
-  workspacePath: string;
   createdAt: string;
   updatedAt: string;
 }

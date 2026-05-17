@@ -32,7 +32,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
     await options.auth.register(email, body.password);
     const login = await options.auth.login(email, body.password);
     reply.code(201).header("set-cookie", login.cookie);
-    return { user: login.user };
+    return { user: serializePublicUser(login.user) };
   });
 
   app.post<{ Body: CredentialsBody }>("/auth/login", async (request, reply) => {
@@ -43,7 +43,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
 
     const login = await options.auth.login(body.email.trim(), body.password);
     reply.header("set-cookie", login.cookie);
-    return { user: login.user };
+    return { user: serializePublicUser(login.user) };
   });
 
   app.post("/auth/logout", async (_request, reply) => {
@@ -53,6 +53,12 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
 
   app.get("/auth/me", async (request) => {
     const current = requireCurrentUser(options.auth, request);
-    return { user: current.user };
+    return { user: serializePublicUser(current.user) };
   });
 };
+
+function serializePublicUser(user: { email: string }) {
+  return {
+    email: user.email,
+  };
+}

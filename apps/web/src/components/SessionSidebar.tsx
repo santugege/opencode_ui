@@ -1,5 +1,5 @@
-import { Circle, LogOut, Plus, Search } from "lucide-react";
-import type { SessionListItemView, UserView } from "../types";
+import { Circle, LogOut, MessageSquare, Plus, Search, Video } from "lucide-react";
+import type { SessionListItemView, UserView, WorkspacePrimaryView } from "../types";
 
 const statusLabel = {
   ready: "就绪",
@@ -10,14 +10,27 @@ const statusLabel = {
 
 interface SessionSidebarProps {
   activeSessionId: string | null;
+  activeView?: WorkspacePrimaryView;
   onCreateSession?: () => void;
+  onOpenChat?: () => void;
+  onOpenVideoTasks?: () => void;
   onSelectSession?: (sessionId: string) => void;
   onSignOut?: () => void;
   sessions: SessionListItemView[];
   user: UserView;
 }
 
-export function SessionSidebar({ activeSessionId, onCreateSession, onSelectSession, onSignOut, sessions, user }: SessionSidebarProps) {
+export function SessionSidebar({
+  activeSessionId,
+  activeView = "chat",
+  onCreateSession,
+  onOpenChat,
+  onOpenVideoTasks,
+  onSelectSession,
+  onSignOut,
+  sessions,
+  user,
+}: SessionSidebarProps) {
   return (
     <aside className="sidebar" aria-label="会话历史">
       <div className="sidebar__brand">
@@ -32,6 +45,27 @@ export function SessionSidebar({ activeSessionId, onCreateSession, onSelectSessi
         <Plus size={16} strokeWidth={2} />
         新建会话
       </button>
+
+      <div className="sidebar__nav" aria-label="工作区视图">
+        <button
+          aria-current={activeView === "chat" ? "page" : undefined}
+          className="sidebar__nav-button"
+          onClick={onOpenChat}
+          type="button"
+        >
+          <MessageSquare size={15} strokeWidth={1.9} />
+          会话
+        </button>
+        <button
+          aria-current={activeView === "videoTasks" ? "page" : undefined}
+          className="sidebar__nav-button"
+          onClick={onOpenVideoTasks}
+          type="button"
+        >
+          <Video size={15} strokeWidth={1.9} />
+          视频任务
+        </button>
+      </div>
 
       <label className="sidebar__search">
         <Search size={15} strokeWidth={1.8} aria-hidden="true" />

@@ -9,7 +9,7 @@ import { isInsideDirectory } from "./workspace.service";
  * 文件服务需要的依赖。
  */
 export interface FileServiceOptions {
-  /** 用于解析会话归属并持久化文件元数据的仓储。 */
+  /** 用于持久化用户上传文件元数据的仓储。 */
   db: MemoryDatabase;
 }
 
@@ -17,8 +17,10 @@ export interface FileServiceOptions {
  * 文件服务接收的已校验上传载荷。
  */
 export interface StoreUploadInput {
-  /** 拥有该上传文件的应用会话。 */
+  /** 拥有该上传文件的 opencode 会话。 */
   sessionId: string;
+  /** 当前用户的 opencode 工作区。 */
+  workspacePath: string;
   /** 浏览器提供的原始文件名。 */
   name: string;
   /** 浏览器提供的 MIME 类型。 */
@@ -69,29 +71,26 @@ export function sanitizeUploadName(name: string) {
 }
 
 /**
- * 创建文件服务，并将上传内容存储到会话工作区内。
+ * 创建文件服务，并将上传内容存储到当前用户工作区内。
  */
 export function createFileService(options: FileServiceOptions) {
   return {
     async storeUpload(input: StoreUploadInput): Promise<SessionFile> {
-      const session = options.db.findWorkspaceSessionById(input.sessionId);
-      if (!session) throw new Error("Workspace session not found");
-
       const safeName = sanitizeUploadName(input.name);
       const id = `file_${randomUUID().replaceAll("-", "_")}`;
       const relativePath = `uploads/${id}-${safeName}`;
-      const absolutePath = resolve(session.workspacePath, relativePath);
+      const absolutePath = resolve(input.workspacePath, relativePath);
 
-      if (!isInsideDirectory(session.workspacePath, absolutePath)) {
-        throw new Error("Upload path escaped session workspace");
+      if (!isInsideDirectory(input.workspacePath, absolutePath)) {
+        throw new Error("Upload path escaped user workspace");
       }
 
-      await mkdir(resolve(session.workspacePath, "uploads"), { recursive: true });
+      await mkdir(resolve(input.workspacePath, "uploads"), { recursive: true });
       await writeFile(absolutePath, input.bytes);
 
       return options.db.createSessionFile({
         id,
-        sessionId: session.id,
+        sessionId: input.sessionId,
         name: input.name,
         kind: inferFileKind(input.mimeType),
         mimeType: input.mimeType,

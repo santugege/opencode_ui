@@ -1,6 +1,8 @@
-import { AlertCircle, Bot, RotateCcw, UserRound } from "lucide-react";
+import { AlertCircle, Bot, RotateCcw, Square, UserRound } from "lucide-react";
 import { FileCard } from "./FileCard";
-import type { ChatMessageView, SessionListItemView } from "../types";
+import { MessageMarkdown } from "./MessageMarkdown";
+import { QuestionRequestCard } from "./QuestionRequestCard";
+import type { ChatMessageView, QuestionAnswerView, QuestionRequestView, SessionListItemView } from "../types";
 
 const statusLabel = {
   ready: "就绪",
@@ -12,11 +14,30 @@ const statusLabel = {
 interface ChatViewProps {
   activeSession: SessionListItemView | null;
   error?: string;
+  isCancelling?: boolean;
+  isStreaming?: boolean;
   messages: ChatMessageView[];
+  onCancelResponse?: () => void;
+  onRejectQuestion?: (requestId: string) => Promise<void> | void;
   onRetry?: () => void;
+  onReplyQuestion?: (requestId: string, answers: QuestionAnswerView[]) => Promise<void> | void;
+  pendingQuestions?: QuestionRequestView[];
 }
 
-export function ChatView({ activeSession, error, messages, onRetry }: ChatViewProps) {
+export function ChatView({
+  activeSession,
+  error,
+  isCancelling = false,
+  isStreaming = false,
+  messages,
+  onCancelResponse,
+  onRejectQuestion,
+  onRetry,
+  onReplyQuestion,
+  pendingQuestions = [],
+}: ChatViewProps) {
+  const hasConversationItems = messages.length > 0 || pendingQuestions.length > 0;
+
   return (
     <section className="chat" aria-label="聊天工作区">
       <header className="chat__header">
@@ -24,9 +45,17 @@ export function ChatView({ activeSession, error, messages, onRetry }: ChatViewPr
           <p className="eyebrow">会话</p>
           <h2>{activeSession?.title ?? "未命名会话"}</h2>
         </div>
-        <span className={`status-pill status-pill--${activeSession?.status ?? "ready"}`}>
-          {statusLabel[activeSession?.status ?? "ready"]}
-        </span>
+        <div className="chat__header-actions">
+          <span className={`status-pill status-pill--${activeSession?.status ?? "ready"}`}>
+            {statusLabel[activeSession?.status ?? "ready"]}
+          </span>
+          {isStreaming ? (
+            <button className="chat__stop" disabled={isCancelling} onClick={onCancelResponse} type="button">
+              <Square size={13} strokeWidth={2.2} />
+              {isCancelling ? "停止中" : "停止"}
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {error ? (
@@ -43,12 +72,15 @@ export function ChatView({ activeSession, error, messages, onRetry }: ChatViewPr
       ) : null}
 
       <div className="chat__scroll">
-        {messages.length === 0 ? (
+        {!hasConversationItems ? (
           <EmptySession />
         ) : (
-          <ol className="message-list">
+          <ol aria-live="polite" className="message-list">
             {messages.map((message) => (
-              <li className={`message message--${message.role}`} key={message.id}>
+              <li
+                className={`message message--${message.role}${message.isStreaming ? " message--streaming" : ""}`}
+                key={message.id}
+              >
                 <span className="message__avatar" aria-hidden="true">
                   {message.role === "assistant" ? (
                     <Bot size={16} strokeWidth={1.9} />
@@ -61,7 +93,7 @@ export function ChatView({ activeSession, error, messages, onRetry }: ChatViewPr
                     <strong>{message.role === "assistant" ? "Opencode" : "你"}</strong>
                     <span>{message.createdAtLabel}</span>
                   </div>
-                  <p>{message.content}</p>
+                  <MessageMarkdown content={message.content} isStreaming={message.isStreaming} />
                   {message.files.length > 0 ? (
                     <div className="message__files">
                       {message.files.map((file) => (
@@ -69,6 +101,20 @@ export function ChatView({ activeSession, error, messages, onRetry }: ChatViewPr
                       ))}
                     </div>
                   ) : null}
+                </div>
+              </li>
+            ))}
+            {pendingQuestions.map((request) => (
+              <li className="message message--assistant message--question" key={request.id}>
+                <span className="message__avatar" aria-hidden="true">
+                  <Bot size={16} strokeWidth={1.9} />
+                </span>
+                <div className="message__content">
+                  <div className="message__meta">
+                    <strong>Opencode</strong>
+                    <span>等待选择</span>
+                  </div>
+                  <QuestionRequestCard onReject={onRejectQuestion} onReply={onReplyQuestion} request={request} />
                 </div>
               </li>
             ))}

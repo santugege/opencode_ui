@@ -3,7 +3,7 @@ import { ApiHttpError } from "../app/errors";
 import { serializeFile } from "../presenters/serializers";
 import type { AuthService } from "../services/auth.service";
 import type { FileService } from "../services/file.service";
-import type { SessionService } from "../services/session.service";
+import type { OpencodeGateway } from "../services/opencode.service";
 import { requireCurrentUser } from "./guards";
 
 /**
@@ -14,12 +14,12 @@ export interface FileRoutesOptions {
   auth: AuthService;
   /** 将上传字节写入工作区的文件服务。 */
   files: FileService;
-  /** 用于执行归属校验的会话服务。 */
-  sessions: SessionService;
+  /** 用于按当前用户工作区校验 opencode 会话归属。 */
+  opencode: OpencodeGateway;
 }
 
 interface SessionParams {
-  /** URL 中的应用会话 ID。 */
+  /** URL 中的 opencode 会话 ID。 */
   sessionId: string;
 }
 
@@ -38,7 +38,8 @@ interface UploadFileBody {
 export const filesRoutes: FastifyPluginAsync<FileRoutesOptions> = async (app, options) => {
   app.post<{ Body: UploadFileBody; Params: SessionParams }>("/sessions/:sessionId/files", async (request, reply) => {
     const current = requireCurrentUser(options.auth, request);
-    const session = options.sessions.findOwnedSession(current.user.id, request.params.sessionId);
+    const sessions = await options.opencode.listSessions({ workspacePath: current.user.workspacePath });
+    const session = sessions.find((candidate) => candidate.id === request.params.sessionId);
     if (!session) throw new ApiHttpError(404, "Session not found.");
 
     const body = request.body ?? {};
@@ -58,6 +59,7 @@ export const filesRoutes: FastifyPluginAsync<FileRoutesOptions> = async (app, op
       mimeType: body.mimeType,
       name: body.name,
       sessionId: session.id,
+      workspacePath: current.user.workspacePath,
     });
 
     reply.code(201);

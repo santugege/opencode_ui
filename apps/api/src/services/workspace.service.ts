@@ -10,19 +10,17 @@ export interface WorkspaceManagerOptions {
 }
 
 /**
- * 创建会话专属工作区所需的入参。
+ * 创建用户级工作区所需的入参。
  */
-export interface CreateSessionWorkspaceInput {
+export interface CreateUserWorkspaceInput {
   /** 拥有该工作区的用户 ID。 */
   userId: string;
-  /** 用于隔离上传文件和 opencode 状态的应用会话 ID。 */
-  sessionId: string;
 }
 
 /**
- * 工作区创建完成后返回的文件系统路径。
+ * 用户工作区创建完成后返回的文件系统路径。
  */
-export interface SessionWorkspace {
+export interface UserWorkspace {
   /** 作为工作区目录传给 opencode 的绝对路径。 */
   absolutePath: string;
   /** 相对配置存储根目录的路径。 */
@@ -46,7 +44,7 @@ export function isInsideDirectory(parent: string, child: string) {
 }
 
 /**
- * 创建并校验用户/会话工作区目录。
+ * 创建并校验用户工作区目录。
  */
 export function createWorkspaceManager(options: WorkspaceManagerOptions) {
   const root = resolve(options.root);
@@ -54,12 +52,10 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions) {
   return {
     root,
 
-    async createSessionWorkspace(input: CreateSessionWorkspaceInput): Promise<SessionWorkspace> {
+    async createUserWorkspace(input: CreateUserWorkspaceInput): Promise<UserWorkspace> {
       assertWorkspaceIdentifier(input.userId);
-      assertWorkspaceIdentifier(input.sessionId);
 
-      const relativePath = `${input.userId}/${input.sessionId}`;
-      const absolutePath = resolve(root, input.userId, input.sessionId);
+      const absolutePath = resolve(root, input.userId);
       if (!isInsideDirectory(root, absolutePath)) {
         throw new Error("Workspace path escaped storage root");
       }
@@ -67,7 +63,7 @@ export function createWorkspaceManager(options: WorkspaceManagerOptions) {
       await mkdir(absolutePath, { recursive: true });
       return {
         absolutePath,
-        relativePath,
+        relativePath: input.userId,
       };
     },
   };

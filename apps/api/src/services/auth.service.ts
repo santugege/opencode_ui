@@ -1,7 +1,9 @@
+import { relative } from "node:path";
 import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import type { User } from "@opencode-ui/shared";
 import type { MemoryDatabase, UserSessionRecord } from "../repositories/memory.repository";
+import type { WorkspaceManager } from "./workspace.service";
 
 const scrypt = promisify(scryptCallback);
 const SESSION_COOKIE_NAME = "opencode_ui_session";
@@ -44,7 +46,7 @@ export interface LoginResult {
   cookie: string;
 }
 
-function normalizeEmail(email: string) {
+function toCanonicalEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
@@ -99,24 +101,28 @@ export function parseSessionCookie(cookie: string) {
 }
 
 /**
- * 基于指定仓储创建认证服务。
+ * 基于指定仓储和工作区管理器创建认证服务。
  */
-export function createAuthService(db: MemoryDatabase) {
+export function createAuthService(db: MemoryDatabase, workspaces: WorkspaceManager) {
   async function register(email: string, password: string) {
-    const normalizedEmail = normalizeEmail(email);
-    const existing = db.findUserByEmail(normalizedEmail);
+    const canonicalEmail = toCanonicalEmail(email);
+    const existing = db.findUserByEmail(canonicalEmail);
     if (existing) {
       throw new AuthError("EMAIL_ALREADY_REGISTERED", "Email is already registered.");
     }
 
+    const passwordHash = await hashPassword(password);
+    const userId = randomUUID();
+    const workspace = await workspaces.createUserWorkspace({ userId });
     const user = db.createUser({
-      id: randomUUID(),
-      email: normalizedEmail,
+      id: userId,
+      email: canonicalEmail,
+      workspacePath: relative(process.cwd(), workspace.absolutePath),
       createdAt: new Date().toISOString(),
     });
     db.setPasswordHash({
       userId: user.id,
-      passwordHash: await hashPassword(password),
+      passwordHash,
     });
     return user;
   }
@@ -128,7 +134,7 @@ export function createAuthService(db: MemoryDatabase) {
   }
 
   async function login(email: string, password: string): Promise<LoginResult> {
-    const user = db.findUserByEmail(normalizeEmail(email));
+    const user = db.findUserByEmail(toCanonicalEmail(email));
     if (!user || !(await verifyPassword(user.id, password))) {
       throw new AuthError("INVALID_CREDENTIALS", "Email or password is incorrect.");
     }

@@ -4,7 +4,11 @@ import { createMemoryDatabase, type MemoryDatabase } from "../repositories/memor
 import { authRoutes } from "../routes/auth.routes";
 import { filesRoutes } from "../routes/files.routes";
 import { healthRoutes } from "../routes/health.routes";
+import { modelsRoutes } from "../routes/models.routes";
+import { questionsRoutes } from "../routes/questions.routes";
+import { responsesRoutes } from "../routes/responses.routes";
 import { sessionsRoutes } from "../routes/sessions.routes";
+import { videoTasksRoutes } from "../routes/videoTasks.routes";
 import { createAuthService } from "../services/auth.service";
 import { createFileService } from "../services/file.service";
 import {
@@ -13,7 +17,7 @@ import {
   type OpencodeMode,
   type SendPromptFn,
 } from "../services/opencode.service";
-import { createSessionService } from "../services/session.service";
+import { createVideoTaskService } from "../services/videoTask.service";
 import { createWorkspaceManager } from "../services/workspace.service";
 import type { JsonFetchOptions, JsonResponse } from "../types/http";
 import { applyCorsHeaders } from "./cors";
@@ -25,6 +29,8 @@ import { registerErrorHandler } from "./errors";
 export interface ApiServerOptions extends RuntimeConfigOverrides {
   /** 测试或嵌入式调用方可覆盖的仓储实现。 */
   db?: MemoryDatabase;
+  /** API 服务关闭时需要同步释放的 opencode 运行时资源。 */
+  opencodeOnClose?: () => Promise<void> | void;
   /** 显式指定的 opencode 模式。 */
   opencodeMode?: OpencodeMode;
   /** 可选的 opencode 会话创建覆盖实现。 */
@@ -46,10 +52,13 @@ export type ApiServer = FastifyInstance & {
 export function createApiServer(options: ApiServerOptions = {}): ApiServer {
   const config = loadRuntimeConfig(options);
   const db = options.db ?? createMemoryDatabase();
-  const auth = createAuthService(db);
   const workspaces = createWorkspaceManager({ root: config.storageRoot });
-  const sessions = createSessionService({ db, workspaces });
+  const auth = createAuthService(db, workspaces);
   const files = createFileService({ db });
+  const videoTasks = createVideoTaskService({
+    apiKey: config.arkApiKey,
+    baseUrl: config.arkBaseUrl,
+  });
   const opencode = createConfiguredOpencodeGateway({
     baseUrl: config.opencodeBaseUrl,
     createOpencodeSession: options.createOpencodeSession,
@@ -71,10 +80,19 @@ export function createApiServer(options: ApiServerOptions = {}): ApiServer {
     reply.code(404).send({ error: "Not found" });
   });
 
+  // Fastify close 是正常退出、信号退出和异常退出的统一收口点。
+  app.addHook("onClose", async () => {
+    await options.opencodeOnClose?.();
+  });
+
   app.register(healthRoutes);
   app.register(authRoutes, { auth });
-  app.register(sessionsRoutes, { auth, db, opencode, sessions });
-  app.register(filesRoutes, { auth, files, sessions });
+  app.register(modelsRoutes, { auth, opencode });
+  app.register(questionsRoutes, { auth, opencode });
+  app.register(responsesRoutes, { auth, db, opencode });
+  app.register(sessionsRoutes, { auth, db, opencode });
+  app.register(filesRoutes, { auth, files, opencode });
+  app.register(videoTasksRoutes, { auth, videoTasks });
 
   return Object.assign(app, {
     async fetchJson(path: string, input: JsonFetchOptions = {}) {

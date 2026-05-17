@@ -33,7 +33,13 @@ describe("opencode client", () => {
   });
 
   it("creates opencode sessions with the user-owned workspace directory query", async () => {
-    const sessionCreate = vi.fn(async () => ({ data: { id: "opencode_session_1", title: "New chat" } }));
+    const sessionCreate = vi.fn(async () => ({
+      data: {
+        id: "opencode_session_1",
+        title: "New chat",
+        time: { created: Date.now(), updated: Date.now() },
+      },
+    }));
     const factory = vi.fn(() => ({ session: { create: sessionCreate } }));
     const service = createOpencodeService({
       baseUrl: "http://127.0.0.1:4096",
@@ -57,7 +63,12 @@ describe("opencode client", () => {
     const attachmentPath = join(workspacePath, "uploads", "brief.txt");
     await mkdir(join(workspacePath, "uploads"), { recursive: true });
     await writeFile(attachmentPath, "hello", "utf8");
-    const sessionPrompt = vi.fn(async () => ({ data: { info: { id: "message_1" }, parts: [] } }));
+    const sessionPrompt = vi.fn(async () => ({
+      data: {
+        info: { id: "message_1", role: "user" as const, time: { created: Date.now() } },
+        parts: [],
+      },
+    }));
     const factory = vi.fn(() => ({ session: { prompt: sessionPrompt } }));
     const service = createOpencodeService({
       baseUrl: "http://127.0.0.1:4096",
@@ -66,7 +77,7 @@ describe("opencode client", () => {
 
     await service.sendPrompt({
       workspacePath,
-      opencodeSessionId: "opencode_session_1",
+      sessionId: "opencode_session_1",
       text: "Summarize this.",
       files: [
         {

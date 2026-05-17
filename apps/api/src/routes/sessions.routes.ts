@@ -1,11 +1,11 @@
 import { resolve } from "node:path";
 import type { FastifyPluginAsync } from "fastify";
 import { ApiHttpError } from "../app/errors";
-import { serializeMessage, serializeSession } from "../presenters/serializers";
+import { errorMessage, sseHeaders, writeSseChunk, writeSseEvent } from "../app/sse";
+import { serializeOpencodeSessionDetail, serializeOpencodeSessionSummary } from "../presenters/serializers";
 import type { MemoryDatabase } from "../repositories/memory.repository";
 import type { AuthService } from "../services/auth.service";
 import type { OpencodeGateway } from "../services/opencode.service";
-import type { SessionService } from "../services/session.service";
 import { requireCurrentUser } from "./guards";
 
 const DEFAULT_SESSION_TITLE = "未命名会话";
@@ -16,12 +16,10 @@ const DEFAULT_SESSION_TITLE = "未命名会话";
 export interface SessionRoutesOptions {
   /** 用于解析当前用户的认证服务。 */
   auth: AuthService;
-  /** 用于序列化文件和消息的仓储。 */
+  /** 用于序列化用户上传文件索引的仓储。 */
   db: MemoryDatabase;
   /** 所有会话路由共用的唯一 opencode 网关。 */
   opencode: OpencodeGateway;
-  /** 包含工作区和消息业务逻辑的会话服务。 */
-  sessions: SessionService;
 }
 
 interface CreateSessionBody {
@@ -30,25 +28,38 @@ interface CreateSessionBody {
 }
 
 interface SessionParams {
-  /** URL 中的应用会话 ID。 */
+  /** URL 中的 opencode 会话 ID。 */
   sessionId: string;
 }
 
 interface SendMessageBody {
-  /** 已上传到同一会话的文件 ID。 */
+  /** 已上传到同一 opencode 会话的文件 ID。 */
   fileIds?: string[];
   /** 用户提示词文本。 */
   text?: string;
 }
 
 /**
- * 注册会话和消息路由。
+ * 注册会话和消息路由。会话历史以 opencode 为唯一来源，本地只保留上传文件索引。
  */
 export const sessionsRoutes: FastifyPluginAsync<SessionRoutesOptions> = async (app, options) => {
   app.get("/sessions", async (request) => {
     const current = requireCurrentUser(options.auth, request);
+    // 首页只需要左侧历史摘要，因此这里禁止批量读取每个会话的消息详情。
+    const [sessions, statuses] = await Promise.all([
+      options.opencode.listSessions({ workspacePath: current.user.workspacePath }),
+      options.opencode.listSessionStatuses({ workspacePath: current.user.workspacePath }),
+    ]);
+
     return {
-      sessions: options.sessions.listByUserId(current.user.id).map((session) => serializeSession(session, options.db)),
+      sessions: sessions.map((session) =>
+        serializeOpencodeSessionSummary({
+          db: options.db,
+          session,
+          status: statuses[session.id],
+          workspacePath: current.user.workspacePath,
+        }),
+      ),
     };
   });
 
@@ -58,26 +69,89 @@ export const sessionsRoutes: FastifyPluginAsync<SessionRoutesOptions> = async (a
     if (body.title !== undefined && typeof body.title !== "string") {
       throw new ApiHttpError(400, "Session title must be a string.");
     }
+
     const title = body.title?.trim() || DEFAULT_SESSION_TITLE;
-    const session = await options.sessions.createPendingSession({ title, userId: current.user.id });
-    const opencodeSession = await options.opencode.createSession({
+    const session = await options.opencode.createSession({
       title,
-      workspacePath: session.workspacePath,
-    });
-    const bound = options.sessions.bindOpencodeSession({
-      opencodeSessionId: opencodeSession.id,
-      sessionId: session.id,
+      workspacePath: current.user.workspacePath,
     });
 
     reply.code(201);
-    return { session: serializeSession(bound, options.db) };
+    return {
+      session: serializeOpencodeSessionSummary({
+        db: options.db,
+        session,
+        status: { type: "idle" },
+        workspacePath: current.user.workspacePath,
+      }),
+    };
+  });
+
+  app.get<{ Params: SessionParams }>("/sessions/:sessionId", async (request) => {
+    const current = requireCurrentUser(options.auth, request);
+    const session = await requireOwnedOpencodeSession(options.opencode, current.user.workspacePath, request.params.sessionId);
+    // 只有用户明确打开某个历史会话时，才读取该会话的完整消息列表。
+    const [messages, statuses] = await Promise.all([
+      options.opencode.listMessages({
+        sessionId: session.id,
+        workspacePath: current.user.workspacePath,
+      }),
+      options.opencode.listSessionStatuses({ workspacePath: current.user.workspacePath }),
+    ]);
+
+    return {
+      session: serializeOpencodeSessionDetail({
+        db: options.db,
+        messages,
+        session,
+        status: statuses[session.id],
+        workspacePath: current.user.workspacePath,
+      }),
+    };
+  });
+
+  app.get<{ Params: SessionParams }>("/sessions/:sessionId/events", async (request, reply) => {
+    const current = requireCurrentUser(options.auth, request);
+    // 这里的 sessionId 只作为授权边界；事件流按当前用户工作区透传，不按单会话过滤。
+    await requireOwnedOpencodeSession(options.opencode, current.user.workspacePath, request.params.sessionId);
+    const eventStream = await options.opencode.subscribeEvents({ workspacePath: current.user.workspacePath });
+    const raw = reply.raw;
+    const headers = sseHeaders(reply.getHeaders());
+
+    reply.hijack();
+    raw.writeHead(200, headers);
+    raw.write(": connected to opencode event stream\n\n");
+
+    const reader = eventStream.body.getReader();
+    let closed = false;
+    const closeStream = () => {
+      closed = true;
+      eventStream.close();
+      void reader.cancel().catch(() => undefined);
+    };
+
+    raw.once("close", closeStream);
+    try {
+      while (!closed) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (raw.destroyed || raw.writableEnded) break;
+        await writeSseChunk(raw, value);
+      }
+    } catch (error) {
+      if (!closed && !raw.destroyed && !raw.writableEnded) {
+        await writeSseEvent(raw, "opencode.stream.error", { error: errorMessage(error) });
+      }
+    } finally {
+      raw.off("close", closeStream);
+      eventStream.close();
+      if (!raw.destroyed && !raw.writableEnded) raw.end();
+    }
   });
 
   app.post<{ Body: SendMessageBody; Params: SessionParams }>("/sessions/:sessionId/messages", async (request, reply) => {
     const current = requireCurrentUser(options.auth, request);
-    const session = options.sessions.findOwnedSession(current.user.id, request.params.sessionId);
-    if (!session) throw new ApiHttpError(404, "Session not found.");
-    if (!session.opencodeSessionId) throw new ApiHttpError(409, "Session is not bound to opencode.");
+    const session = await requireOwnedOpencodeSession(options.opencode, current.user.workspacePath, request.params.sessionId);
 
     const body = request.body ?? {};
     if (body.text !== undefined && typeof body.text !== "string") {
@@ -96,27 +170,34 @@ export const sessionsRoutes: FastifyPluginAsync<SessionRoutesOptions> = async (a
       throw new ApiHttpError(400, "One or more attached files were not found.");
     }
 
-    await options.opencode.sendPrompt({
+    await options.opencode.sendPromptAsync({
       files: attachedFiles.map((file) => ({
-        absolutePath: resolve(session.workspacePath, file.relativePath),
+        absolutePath: resolve(current.user.workspacePath, file.relativePath),
         filename: file.name,
         mimeType: file.mimeType,
       })),
-      opencodeSessionId: session.opencodeSessionId,
+      sessionId: session.id,
       text,
-      workspacePath: session.workspacePath,
+      workspacePath: current.user.workspacePath,
     });
 
-    const result = options.sessions.recordUserMessage({
-      files: attachedFiles,
-      session,
-      text,
-    });
-
-    reply.code(201);
+    reply.code(202);
     return {
-      message: serializeMessage(result.message),
-      session: serializeSession(result.session, options.db),
+      accepted: true,
+      eventsPath: `/sessions/${session.id}/events`,
+      sessionId: session.id,
     };
   });
 };
+
+/**
+ * 通过当前用户工作区反查会话，防止浏览器直接访问其他工作区的 opencode 会话。
+ */
+async function requireOwnedOpencodeSession(opencode: OpencodeGateway, workspacePath: string, sessionId: string | undefined) {
+  if (!sessionId) throw new ApiHttpError(404, "Session not found.");
+
+  const sessions = await opencode.listSessions({ workspacePath });
+  const session = sessions.find((candidate) => candidate.id === sessionId);
+  if (!session) throw new ApiHttpError(404, "Session not found.");
+  return session;
+}

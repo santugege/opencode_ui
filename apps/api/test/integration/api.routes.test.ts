@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiServer, type ApiServerOptions } from "../../src/app/createApp";
 
@@ -91,11 +92,28 @@ describe("api server routes", () => {
   });
 
   it("creates sessions, uploads files, sends messages, and revisits history", async () => {
+    const now = Date.now();
     const createOpencodeSession = vi.fn<NonNullable<ApiServerOptions["createOpencodeSession"]>>(async () => ({
       id: "opencode_session_1",
       title: "Research session",
+      time: { created: now, updated: now },
     }));
-    const sendPrompt = vi.fn<NonNullable<ApiServerOptions["sendPrompt"]>>(async () => ({ ok: true }));
+    const sendPrompt = vi.fn<NonNullable<ApiServerOptions["sendPrompt"]>>(async (input) => ({
+      info: {
+        id: "message_1",
+        role: "user",
+        time: { created: now + 1 },
+      },
+      parts: [
+        ...input.files.map((file) => ({
+          type: "file" as const,
+          mime: file.mimeType,
+          filename: file.filename,
+          url: pathToFileURL(file.absolutePath).href,
+        })),
+        { type: "text" as const, text: input.text },
+      ],
+    }));
     const server = createApiServer({
       createOpencodeSession,
       sendPrompt,
@@ -117,7 +135,7 @@ describe("api server routes", () => {
     expect(created.status).toBe(201);
     const createdBody = created.body as AnyJson;
     expect(createdBody.session.title).toBe("Research session");
-    expect(createdBody.session.opencodeSessionId).toBe("opencode_session_1");
+    expect(createdBody.session.id).toBe("opencode_session_1");
 
     const upload = await server.fetchJson(`/sessions/${createdBody.session.id}/files`, {
       body: {
@@ -148,7 +166,7 @@ describe("api server routes", () => {
     expect(messageBody.message.files).toHaveLength(1);
     expect(sendPrompt).toHaveBeenCalledWith(
       expect.objectContaining({
-        opencodeSessionId: "opencode_session_1",
+        sessionId: "opencode_session_1",
         text: "Summarize this file.",
       }),
     );
@@ -161,7 +179,16 @@ describe("api server routes", () => {
     expect(history.status).toBe(200);
     const historyBody = history.body as AnyJson;
     expect(historyBody.sessions).toHaveLength(1);
-    expect(historyBody.sessions[0].messages[0].content).toBe("Summarize this file.");
+    expect(historyBody.sessions[0].messages).toBeUndefined();
+
+    const detail = await server.fetchJson(`/sessions/${createdBody.session.id}`, {
+      headers: { cookie },
+      method: "GET",
+    });
+
+    expect(detail.status).toBe(200);
+    const detailBody = detail.body as AnyJson;
+    expect(detailBody.session.messages[0].content).toBe("Summarize this file.");
   });
 
   it("uses test-mode opencode stubs when requested for browser e2e runs", async () => {
@@ -184,7 +211,7 @@ describe("api server routes", () => {
 
     expect(created.status).toBe(201);
     const createdBody = created.body as AnyJson;
-    expect(createdBody.session.opencodeSessionId).toMatch(/^stub-opencode-/);
+    expect(createdBody.session.id).toMatch(/^stub-opencode-/);
 
     const message = await server.fetchJson(`/sessions/${createdBody.session.id}/messages`, {
       body: {

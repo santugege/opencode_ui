@@ -14,42 +14,26 @@ describe("domain types", () => {
     const user: User = {
       id: "user_1",
       email: "person@example.com",
+      workspacePath: "storage/workspaces/user_1",
       createdAt: "2026-05-15T00:00:00.000Z",
     };
 
     expect(user.email).toBe("person@example.com");
+    expect(user.workspacePath).toContain("storage/workspaces/user_1");
   });
 
-  it("models an app session bound to an opencode session and workspace", () => {
+  it("models an opencode-backed workspace session", () => {
     const status: SessionStatus = "ready";
     const session: WorkspaceSession = {
-      id: "session_1",
+      id: "opencode_session_1",
       userId: "user_1",
-      opencodeSessionId: "opencode_session_1",
       title: "Research notes",
       status,
-      workspacePath: "storage/workspaces/user_1/session_1",
       createdAt: "2026-05-15T00:00:00.000Z",
       updatedAt: "2026-05-15T00:01:00.000Z",
     };
 
-    expect(session.opencodeSessionId).toBe("opencode_session_1");
-    expect(session.workspacePath).toContain("storage/workspaces");
-  });
-
-  it("allows sessions to exist before opencode binding", () => {
-    const session: WorkspaceSession = {
-      id: "session_1",
-      userId: "user_1",
-      opencodeSessionId: null,
-      title: "Pending binding",
-      status: "ready",
-      workspacePath: "storage/workspaces/user_1/session_1",
-      createdAt: "2026-05-15T00:00:00.000Z",
-      updatedAt: "2026-05-15T00:00:00.000Z",
-    };
-
-    expect(session.opencodeSessionId).toBeNull();
+    expect(session.id).toBe("opencode_session_1");
   });
 
   it("models chat messages with inline session files", () => {

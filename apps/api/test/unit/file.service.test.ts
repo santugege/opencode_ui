@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createMemoryDatabase } from "../../src/repositories/memory.repository";
 import { createFileService, inferFileKind, sanitizeUploadName } from "../../src/services/file.service";
-import { createSessionService } from "../../src/services/session.service";
 import { isInsideDirectory, createWorkspaceManager } from "../../src/services/workspace.service";
 
 describe("file uploads", () => {
@@ -18,43 +17,40 @@ describe("file uploads", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  async function createSessionFixture() {
+  async function createWorkspaceFixture() {
     const db = createMemoryDatabase();
-    const sessions = createSessionService({
-      db,
-      workspaces: createWorkspaceManager({ root }),
-    });
-    const session = await sessions.createPendingSession({
+    const workspace = await createWorkspaceManager({ root }).createUserWorkspace({
       userId: "user_1",
-      title: "Files",
     });
-    return { db, session };
+    return { db, sessionId: "opencode_session_1", workspacePath: workspace.absolutePath };
   }
 
-  it("stores an upload only inside the session workspace", async () => {
-    const { db, session } = await createSessionFixture();
+  it("stores an upload only inside the user workspace", async () => {
+    const { db, sessionId, workspacePath } = await createWorkspaceFixture();
     const files = createFileService({ db });
 
     const file = await files.storeUpload({
-      sessionId: session.id,
+      sessionId,
+      workspacePath,
       name: "brief.pdf",
       mimeType: "application/pdf",
       bytes: Buffer.from("pdf content"),
     });
 
-    const absolutePath = resolve(session.workspacePath, file.relativePath);
-    expect(isInsideDirectory(session.workspacePath, absolutePath)).toBe(true);
+    const absolutePath = resolve(workspacePath, file.relativePath);
+    expect(isInsideDirectory(workspacePath, absolutePath)).toBe(true);
     expect(file.relativePath).toMatch(/^uploads\/file_[A-Za-z0-9_-]+-brief\.pdf$/);
     expect(await readFile(absolutePath, "utf8")).toBe("pdf content");
   });
 
   it("rejects path traversal filenames", async () => {
-    const { db, session } = await createSessionFixture();
+    const { db, sessionId, workspacePath } = await createWorkspaceFixture();
     const files = createFileService({ db });
 
     await expect(
       files.storeUpload({
-        sessionId: session.id,
+        sessionId,
+        workspacePath,
         name: "../escape.txt",
         mimeType: "text/plain",
         bytes: Buffer.from("nope"),
@@ -63,21 +59,22 @@ describe("file uploads", () => {
   });
 
   it("creates file records with kind, mime type, size, and session ownership", async () => {
-    const { db, session } = await createSessionFixture();
+    const { db, sessionId, workspacePath } = await createWorkspaceFixture();
     const files = createFileService({ db });
 
     const file = await files.storeUpload({
-      sessionId: session.id,
+      sessionId,
+      workspacePath,
       name: "image.png",
       mimeType: "image/png",
       bytes: Buffer.from([1, 2, 3]),
     });
 
-    expect(file.sessionId).toBe(session.id);
+    expect(file.sessionId).toBe(sessionId);
     expect(file.kind).toBe("image");
     expect(file.mimeType).toBe("image/png");
     expect(file.size).toBe(3);
-    expect(db.listSessionFiles(session.id)).toEqual([file]);
+    expect(db.listSessionFiles(sessionId)).toEqual([file]);
   });
 
   it("sanitizes simple filenames and classifies supported file kinds", () => {

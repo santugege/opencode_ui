@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import App, { WorkspaceApp } from "./App";
-import type { ApiClient, ApiSession } from "./api";
+import type { ApiClient, ApiSession, ApiSessionDetail } from "./api";
 import type { WorkspaceViewModel } from "./types";
 
 const styles = readFileSync("src/styles.css", "utf8");
@@ -228,7 +228,7 @@ describe("App integration shell", () => {
 
 function createFakeApi(): ApiClient {
   let user: { email: string } | null = null;
-  let sessions: ApiSession[] = [];
+  let sessions: ApiSessionDetail[] = [];
   let sequence = 0;
   const logout = vi.fn(async () => {
     user = null;
@@ -238,7 +238,7 @@ function createFakeApi(): ApiClient {
   return {
     async createSession(input) {
       sequence += 1;
-      const session: ApiSession = {
+      const session: ApiSessionDetail = {
         id: `session-${sequence}`,
         title: input.title,
         status: "ready",
@@ -247,11 +247,17 @@ function createFakeApi(): ApiClient {
         messages: [],
       };
       sessions = [session, ...sessions];
+      return toSessionSummary(session);
+    },
+
+    async getSession(sessionId) {
+      const session = sessions.find((candidate) => candidate.id === sessionId);
+      if (!session) throw new Error("Session not found");
       return session;
     },
 
     async listSessions() {
-      return sessions;
+      return sessions.map(toSessionSummary);
     },
 
     async login(input) {
@@ -301,5 +307,15 @@ function createFakeApi(): ApiClient {
       session.files = [...session.files, uploaded];
       return uploaded;
     },
+  };
+}
+
+function toSessionSummary(session: ApiSessionDetail): ApiSession {
+  return {
+    id: session.id,
+    title: session.title,
+    status: session.status,
+    updatedAt: session.updatedAt,
+    files: session.files,
   };
 }
